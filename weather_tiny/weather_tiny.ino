@@ -36,8 +36,9 @@ GxEPD_Class display(io, ELINK_RESET, ELINK_BUSY);
 #include <DNSServer.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <rom/rtc.h> 
+#include <rom/rtc.h>
 #include <Preferences.h>
+#include <mbedtls/md5.h>
 
 #define ADC_PIN 35
 #define WAKE_BTN_PIN 39
@@ -72,6 +73,12 @@ GxEPD_Class display(io, ELINK_RESET, ELINK_BUSY);
 #define CONFIG_MODE 1
 #define VALIDATING_MODE 2
 #define OPERATING_MODE 3
+
+void disconnect_from_wifi();
+void set_mode(int mode);
+int get_battery_percent(int adc_value);
+void save_location_to_memory(int location_id);
+void set_mode_and_reboot(int mode);
 
 // http server for obtaining configuration
 DNSServer dnsServer;
@@ -123,7 +130,7 @@ void update_header_view(View& view, bool data_updated) {
     view.location = location[curr_loc].name.substring(0,7);
     view.battery_percent = get_battery_percent(analogRead(ADC_PIN));
     int percent_display = view.battery_percent;
-    
+
     if (percent_display > 100) {
         percent_display = 100;
     }
@@ -146,10 +153,10 @@ void update_weather_view(View& view, bool data_updated) {
         return;
     }
     view.weather_icon = String(icon2meteo_font(weather_request.hourly[0].icon));
-    
+
     String descr = weather_request.hourly[0].descr;
     view.weather_desc = capitalize(descr);
-    
+
     view.temp_curr = left_pad(String(weather_request.hourly[0].temp), 3);
     view.temp_unit = '*';  // celsius
     view.temp_high = "Hi" + left_pad(String(weather_request.hourly[0].max_t), 3);
@@ -266,7 +273,7 @@ bool datetime_handler(WiFiClient& resp_stream, Request request) {
     datetime_response.print();
     return true;
 }
-    
+
 
 bool weather_handler(WiFiClient& resp_stream, Request request) {
     const int json_size = 35 * 1024;
@@ -301,7 +308,7 @@ bool air_quality_handler(WiFiClient& resp_stream, Request request) {
     const int json_size = 6 * 1024;
     DynamicJsonDocument doc = deserialize(resp_stream, json_size);
     JsonObject api_resp = doc.as<JsonObject>();
-    
+
     if (api_resp.isNull()) {
         return false;
     }
@@ -309,14 +316,14 @@ bool air_quality_handler(WiFiClient& resp_stream, Request request) {
         return false;
     }
     airquality_request = AirQualityRequest(request);
-    
+
     if (api_resp["data"]["iaqi"].containsKey("pm25")) {
         airquality_request.response.pm25 = api_resp["data"]["iaqi"]["pm25"]["v"].as<int>();
     } else if (api_resp["data"]["forecast"]["daily"].containsKey("pm25")) {
         airquality_request.response.pm25 = api_resp["data"]["forecast"]["daily"]["pm25"][0]["max"].as<int>();
     }
     airquality_request.response.print();
-    
+
     return true;
 }
 
@@ -326,7 +333,7 @@ DynamicJsonDocument deserialize(WiFiClient& resp_stream, const int size, bool is
     Serial.print("\nDeserializing json, size:" + String(size) + " bytes...");
     DynamicJsonDocument doc(size);
     DeserializationError error;
-    
+
     if (is_embeded) {
         String stream_as_string = resp_stream.readString();
         int begin = stream_as_string.indexOf('{');
@@ -357,7 +364,7 @@ int get_battery_percent(int adc_value) {
     }
     if (voltage > 4.2) {
         return 100;
-    } 
+    }
     if (voltage < 3.3) {
         return 1;
     }
@@ -368,7 +375,7 @@ int get_battery_percent(int adc_value) {
 
 
 bool http_request_data(WiFiClient& client, Request request, unsigned int retry=3) {
-    
+
     bool ret_val = false;
 
     while(!ret_val && retry--) {
@@ -378,7 +385,7 @@ bool http_request_data(WiFiClient& client, Request request, unsigned int retry=3
         Serial.printf("\nHTTP connecting to %s%s [retry left: %s]", request.server.c_str(), request.path.c_str(), String(retry).c_str());
         http.begin(client, request.server, 80, request.path);
         int http_code = http.GET();
-        
+
         if(http_code == HTTP_CODE_OK) {
             Serial.println("\nHTTP connection established");
             if (!request.handler(http.getStream(), request)) {
@@ -406,17 +413,17 @@ bool connect_to_wifi(unsigned int retry=5) {
         Serial.println("\nConnecting to: " + wifi.ssid + " [retry left: " + retry +"]");
         unsigned long start = millis();
         wifi_conn_status = WiFi.begin(wifi.ssid.c_str(), wifi.pass.c_str());
-        
+
         while (true) {
             if (millis() > start + 10000) { // 10s
                 break;
             }
             delay(100);
-    
+
             wifi_conn_status = WiFi.status();
-            
+
             if (wifi_conn_status == WL_CONNECTED) {
-                Serial.println("Wifi connected. IP: " + WiFi.localIP().toString());    
+                Serial.println("Wifi connected. IP: " + WiFi.localIP().toString());
                 break;
             } else if(wifi_conn_status == WL_CONNECT_FAILED) {
                 Serial.println("Wifi failed to connect.");
@@ -437,7 +444,7 @@ void print_reset_reason(RESET_REASON reason) {
         case 3 : Serial.print("SW_RESET"); break;
         case 4 : Serial.print("OWDT_RESET"); break;
         case 5 : Serial.print("DEEPSLEEP_RESET"); break;
-        case 6 : Serial.print("SDIO_RESET"); break; 
+        case 6 : Serial.print("SDIO_RESET"); break;
         case 7 : Serial.print("TG0WDT_SYS_RESET"); break;
         case 8 : Serial.print("TG1WDT_SYS_RESET"); break;
         case 9 : Serial.print("RTCWDT_SYS_RESET"); break;
@@ -456,12 +463,12 @@ void print_reset_reason(RESET_REASON reason) {
 void wakeup_reason() {
     esp_sleep_wakeup_cause_t wakeup_reason;
     wakeup_reason = esp_sleep_get_wakeup_cause();
-    
+
     switch(wakeup_reason){
         Serial.println("Location variable: " + String(curr_loc));
-        
-        case ESP_SLEEP_WAKEUP_EXT0 : 
-            Serial.println("\nWakeup by ext signal RTC_IO -> GPIO39"); 
+
+        case ESP_SLEEP_WAKEUP_EXT0 :
+            Serial.println("\nWakeup by ext signal RTC_IO -> GPIO39");
             if (get_mode() == OPERATING_MODE) {
                 // Toggle between 2 screens caused by button press WAKE_BTN_PIN
                 if (location_cnt > 1) {
@@ -469,14 +476,14 @@ void wakeup_reason() {
                     // save location
                     save_location_to_memory(curr_loc);
                 }
-            }        
+            }
             break;
-            
-        case ESP_SLEEP_WAKEUP_EXT1 : 
-            Serial.println("Wakeup by ext signal RTC_CNTL -> GPIO34"); 
+
+        case ESP_SLEEP_WAKEUP_EXT1 :
+            Serial.println("Wakeup by ext signal RTC_CNTL -> GPIO34");
             set_mode_and_reboot(CONFIG_MODE);
             break;
-            
+
         case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup by timer"); break;
         case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Wakeup by touchpad"); break;
         case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup by ULP program"); break;
@@ -501,7 +508,7 @@ void enable_timed_sleep(int interval_minutes) {
     int sleep_minutes_left = interval_minutes - current_time_min % interval_minutes - 1;  // - 1 minute running in seconds
     int sleep_seconds_left = 60 - current_time_sec;
     int sleep_time_seconds = sleep_minutes_left * 60 + sleep_seconds_left;
-    
+
     long sleep_time_micro_sec = sleep_time_seconds * 1000 * 1000;
     esp_sleep_enable_timer_wakeup(sleep_time_micro_sec);
     Serial.printf("\nWake up in %d minutes and %d seconds", sleep_minutes_left, sleep_seconds_left);
@@ -516,7 +523,7 @@ void begin_deep_sleep() {
 
     display.powerDown();
     disconnect_from_wifi();
-    
+
 #ifdef WAKE_BTN_PIN
     //  https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/sleep_modes.html
     esp_sleep_enable_ext0_wakeup((gpio_num_t)WAKE_BTN_PIN, LOW);
@@ -565,7 +572,7 @@ String get_param(AsyncWebServerRequest *request, String name, bool& exists) {
 
         if (value.equals("")) {
             exists = false;
-            return "";        
+            return "";
         }
         exists = exists && true;
         return value;
@@ -579,10 +586,10 @@ String create_validation_message(bool valid_wifi, bool valid_location_1, bool va
     String wifi_error_msg = "";
     String location_1_error_msg = "";
     String location_2_error_msg = "";
-        
+
     if (!valid_wifi) {
         wifi_error_msg = "Missing WIFI credentials. Please provide SSID and password.\n";
-    }        
+    }
     if (!valid_location_1) {
         location_1_error_msg = "Invalid location 1. Please provide name and postition.";
     }
@@ -603,7 +610,7 @@ String create_validation_message(bool valid_wifi, bool valid_location_1, bool va
     String("<h3>") + wifi_error_msg + String("</h3><br>") +
     String("<h3>") + location_1_error_msg + String("</h3><br>") +
     String("<h3>") + location_2_error_msg + String("</h3><br>");
-        
+
     return response_msg;
 }
 
@@ -645,7 +652,7 @@ int read_location_from_memory() {
 
 void save_config_to_memory() {
     Serial.println("Save config to memory.");
-    
+
     preferences.begin(MEMORY_ID, false);  // first param false means 'read/write'
 
     wifi.print();
@@ -719,23 +726,23 @@ public:
 
 void run_config_server() {
     String network = "weather-wifi";
-    String pass = String(abs((int)esp_random())).substring(0, 4) + "0000";
+    String pass = String(/*abs*/(esp_random())).substring(0, 4) + "0000";
     WiFi.softAP(network.c_str(), pass.c_str());
     //WiFi.softAP(network.c_str());  // <- without password
-    
+
     String ip = WiFi.softAPIP().toString();
     dnsServer.start(53, "*", WiFi.softAPIP());
-    
+
     Serial.printf("\nStart config server on ssid: %s, pass: %s, ip: %s \n\n", network.c_str(), pass.c_str(), ip.c_str());
     display_config_mode(network, pass, ip);
-    
+
     display.update();
 
     server.on("/config", HTTP_POST, [](AsyncWebServerRequest *request){
         bool valid_wifi = true;
         bool valid_location_1 = true;
         bool valid_location_2 = true;
-        
+
         String ssid = get_param(request, "ssid", valid_wifi);
         String pass = get_param(request, "pass", valid_wifi);
         String location_1 = get_param(request, "loc1", valid_location_1);
@@ -748,7 +755,7 @@ void run_config_server() {
 
             location_cnt = 1;
             location[0].name = location_1;
-            
+
             if (valid_location_2) {
                 location_cnt = 2;
                 location[1].name = location_2;
@@ -772,25 +779,25 @@ void run_config_server() {
 
 void run_validating_mode() {
     server.end();
-        
+
     read_config_from_memory();
     display_validating_mode();
     display.update();
-    
+
     if (connect_to_wifi()) {
         location_request.handler = location_handler;
         WiFiClient client;
         bool is_location_fetched = false;
-        
+
         if (location_cnt > 0) {
             location_request.name = location[0].name;
             location_request.make_path();
-            is_location_fetched = http_request_data(client, location_request);    
+            is_location_fetched = http_request_data(client, location_request);
         }
         if (is_location_fetched) {
             location[0].lat = location_request.response.lat;
             location[0].lon = location_request.response.lon;
-                
+
             if (location_cnt > 1) {
                 location_request.name = location[1].name;
                 location_request.make_path();
@@ -838,10 +845,10 @@ void run_operating_mode() {
 
         view = View();
 
-        update_header_view(view, is_time_fetched); 
+        update_header_view(view, is_time_fetched);
         update_weather_view(view, is_weather_fetched);
         update_air_quality_view(view, is_aq_fetched);
-            
+
         Serial.println("\nUpdate display.");
         display_header(view);
         display_weather(view);
@@ -883,7 +890,7 @@ int get_mode(bool cached_mode) {
 
 
 void setup() {
-    Serial.begin(115200); 
+    Serial.begin(115200);
     Serial.println("\n\n=== WEATHER STATION ===");
     init_display();
 
@@ -892,7 +899,7 @@ void setup() {
         set_mode_and_reboot(CONFIG_MODE);
     }
     const int mode = get_mode();
-    
+
     if (mode == CONFIG_MODE) {
         Serial.println("MODE: Config");
         run_config_server();
@@ -906,9 +913,9 @@ void setup() {
 }
 
 
-void loop() {  
+void loop() {
     // Serial.println("Handling DNS");
 
-    // Used only in CONFIG mode 
+    // Used only in CONFIG mode
     dnsServer.processNextRequest();
 }

@@ -25,7 +25,7 @@ struct WindArrow {
         _rotate_point(rad, &x2, &y2);
         _rotate_point(rad, &x3, &y3);
     }
-    
+
     void draw(int x, int y, GxEPD_Class& display) {
         this->x = x;
         this->y = y;
@@ -35,11 +35,11 @@ struct WindArrow {
 
 
     private:
-    
+
     void _rotate_point(float rad, float *x, float *y) {
         float xc = *x - this->x;
         float yc = *y - this->y;
-        
+
         // p'x = cos(theta) * (px-ox) - sin(theta) * (py-oy) + ox
         // p'y = sin(theta) * (px-ox) + cos(theta) * (py-oy) + oy
         *x = cos(rad) * xc - sin(rad) * yc + this->x;
@@ -138,9 +138,9 @@ void print_text_x(int x, String text) {
 
 
 void init_display() {
-    Serial.print("init_display...");
+    Serial.print("init_display\n");
     SPI.begin(SPI_CLK, SPI_MISO, SPI_MOSI, ELINK_SS);
-    // enable diagnostic output on Serial 
+    // enable diagnostic output on Serial
     display.init(115200);
     display.setRotation(3);
     display.setTextWrap(false);
@@ -174,14 +174,14 @@ void display_header(View& view) {
     int batt_x = SCREEN_WIDTH - get_text_width(view.datetime) - 33;
     display_battery_icon(batt_x, 3, display, view.battery_percent);
     // display_battery_percentage
-    // print_text(batt_x, 3, view.battery_percent_display);  
+    // print_text(batt_x, 3, view.battery_percent_display);
 }
 
 
 void display_weather(View& view) {
     display.setFont(&meteocons_webfont10pt7b);
     print_text(2, 21, view.weather_icon);
-    
+
     display.setFont(&Cousine_Regular6pt7b);
     print_text(30, 24, view.weather_desc);
 
@@ -190,7 +190,7 @@ void display_weather(View& view) {
 
     display.setFont(&meteocons_webfont8pt7b);
     print_text(78, 48, view.temp_unit);
-    
+
     display.setFont(&Cousine_Regular6pt7b);
     print_text(0, 45, view.temp_high);
     print_text(0, 55, view.temp_low);
@@ -199,12 +199,12 @@ void display_weather(View& view) {
     // pressure
     display.setFont(&monofonto12pt7b);
     print_text(100, 45, view.pressure);
-    
+
     display.setFont(&Cousine_Regular6pt7b);
     print_text(125, 65, view.pressure_unit);
 
     // wind
-    display.setFont(&monofonto12pt7b);    
+    display.setFont(&monofonto12pt7b);
     print_text(180, 45, view.wind);
     WindArrow wind_arrow;
     wind_arrow.rotate(view.wind_deg);
@@ -213,7 +213,7 @@ void display_weather(View& view) {
 
     display.setFont(&Cousine_Regular6pt7b);
     print_text(183, 65, view.wind_unit);
-    
+
     // hourly rain forecast
     display.setFont(&Cousine_Regular6pt7b);
     print_text(0, 83, view.percip_time_unit);

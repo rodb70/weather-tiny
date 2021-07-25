@@ -1,0 +1,18 @@
+[submodule "weather_tiny/Adafruit_ftGFX"]
+	path = weather_tiny/Adafruit_ftGFX
+	url = https://github.com/pljakobs/Adafruit_ftGFX.git
+[submodule "weather_tiny/Adafruit-GFX-Library"]
+	path = weather_tiny/Adafruit-GFX-Library
+	url = https://github.com/adafruit/Adafruit-GFX-Library.git
+[submodule "weather_tiny/ArduinoJson"]
+	path = weather_tiny/ArduinoJson
+	url = https://github.com/bblanchon/ArduinoJson.git
+[submodule "weather_tiny/AsyncTCP"]
+	path = weather_tiny/AsyncTCP
+	url = https://github.com/me-no-dev/AsyncTCP.git
+[submodule "weather_tiny/ESPAsyncWebServer"]
+	path = weather_tiny/ESPAsyncWebServer
+	url = https://github.com/me-no-dev/ESPAsyncWebServer.git
+[submodule "weather_tiny/GxEPD"]
+	path = weather_tiny/GxEPD
+	url = https://github.com/lewisxhe/GxEPD.git
