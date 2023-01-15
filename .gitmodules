@@ -19,3 +19,6 @@
 [submodule "weather_tiny/Adafruit_BusIO"]
 	path = weather_tiny/Adafruit_BusIO
 	url = https://github.com/adafruit/Adafruit_BusIO.git
+[submodule "makeEspArduino"]
+	path = makeEspArduino
+	url = git@github.com:rodb70/makeEspArduino.git
