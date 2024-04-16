@@ -117,13 +117,3 @@ Verify and upload the weather_mini.ino sketch.
 After successful upload turn on the device and configure it as shown in [device configuration](#device-configuration) section.
 See the example output from [serial monitor](monitor_log.txt) for a successful device configuration.
 
-### Support
-
-If you have found this project useful you can buy me a cup of coffee 
-
-<a href='https://ko-fi.com/O5O8AOOS7' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://cdn.ko-fi.com/cdn/kofi1.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
-
-[![Donate with Bitcoin](https://en.cryptobadges.io/badge/big/bc1qt2sd4ys4q3dh8jk9s72rgcpy8855ydzjx323dd)](https://en.cryptobadges.io/donate/bc1qt2sd4ys4q3dh8jk9s72rgcpy8855ydzjx323dd)
-
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEJ9YA2MMH9SA)
-
